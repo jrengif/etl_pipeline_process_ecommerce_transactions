@@ -6,7 +6,7 @@ Using a containerized architecture involving Docker, Airflow, Python, DBT, and P
 
 ## Architecture Overview
 
-For more information about the architecure components ([Check Solution Architecture Documentation](project_documentation/data_modeling/raw_metada_doc.md)).
+For more information about the architecure components ([Check Solution Architecture Documentation](project_documentation/architechture_documentation/solution_architecture.md)).
 
 The processing pipeline involved in the architecture is the next:
 
