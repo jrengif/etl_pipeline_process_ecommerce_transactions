@@ -1,4 +1,4 @@
-# OLAP Data Model Metadata Documentation
+# OLAP Data Model & Metadata Documentation
 
 This document provides metadata for the OLAP data model implemented for the e-commerce data pipeline project. The model is designed as a star schema, with `Fact_Transactions` as the central fact table and supporting dimension tables (`Dim_Product`, `Dim_Customer`, `Dim_Country`, and `Dim_Date`).
 
