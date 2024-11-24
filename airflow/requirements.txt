@@ -1,0 +1,9 @@
+apache-airflow==2.9.0  # Airflow core version
+apache-airflow[postgres,redis]==2.9.0  # Airflow with Postgres and Redis support
+apache-airflow-providers-docker==2.7.0  # Docker provider for Airflow to run Docker containers
+psycopg2-binary==2.9.6  # PostgreSQL driver
+dbt-core==1.5.0  # DBT core package (if directly used in Airflow)
+requests==2.28.1  # For HTTP requests (if needed)
+pandas==1.5.2  # For working with data frames (if needed)
+sqlalchemy==1.4.47
+ucimlrepo # library to extract de dataset

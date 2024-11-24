@@ -1,0 +1,111 @@
+version: '3.8'
+
+services:
+  airflow_webserver:
+    build: .
+    container_name: airflow_webserver
+    env_file:
+      - .env  # This will load the environment variables from the .env file
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://{{ env_var("POSTGRES_STAGING_USER") }}:{{ env_var("POSTGRES_STAGING_PASSWORD") }}@{{ env_var("POSTGRES_STAGING_HOST") }}:{{ env_var("POSTGRES_STAGING_PORT") }}/{{ env_var("POSTGRES_STAGING_DB") }}
+      - AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX=True  # Important for running Airflow behind a proxy  or localhost
+      - _AIRFLOW_WWW_USER_USERNAME=${AIRFLOW_ADMIN_USERNAME}
+      - _AIRFLOW_WWW_USER_PASSWORD=${AIRFLOW_ADMIN_PASSWORD}
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY}
+      - AIRFLOW__WEBSERVER__AUTHENTICATE=True
+      - POSTGRES_STAGING_USER=${POSTGRES_STAGING_USER}
+      - POSTGRES_STAGING_PASSWORD=${POSTGRES_STAGING_PASSWORD}
+      - POSTGRES_STAGING_DB=${POSTGRES_STAGING_DB}
+      - POSTGRES_STAGING_PORT=${POSTGRES_STAGING_PORT}
+      - POSTGRES_STAGING_HOST=${POSTGRES_STAGING_HOST}
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/requirements.txt:/requirements.txt
+    ports:
+      - "8080:8080"  # Expose port 8080 for Airflow Web UI
+    command: bash -c "pip install -r /requirements.txt && airflow db init && airflow users create --username ${AIRFLOW_ADMIN_USERNAME} --password ${AIRFLOW_ADMIN_PASSWORD} --role Admin --firstname Admin --lastname User --email admin@example.com && airflow webserver --host 0.0.0.0 --port 8080"
+    depends_on:
+      - staging_layer_db
+    networks:
+      - airflow_network  # Custom network for all services to communicate
+
+  airflow-scheduler:
+    image: apache/airflow:2.9.0-python3.9
+    container_name: airflow-scheduler
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=${AIRFLOW_SQL_ALCHEMY_CONN}
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY}
+      - POSTGRES_STAGING_USER=${POSTGRES_STAGING_USER}
+      - POSTGRES_STAGING_PASSWORD=${POSTGRES_STAGING_PASSWORD}
+      - POSTGRES_STAGING_DB=${POSTGRES_STAGING_DB}
+      - POSTGRES_STAGING_PORT=${POSTGRES_STAGING_PORT}
+      - POSTGRES_STAGING_HOST=${POSTGRES_STAGING_HOST}
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/requirements.txt:/requirements.txt
+    command: bash -c "pip install -r /requirements.txt && airflow db init && airflow scheduler"
+    depends_on:
+      - airflow_webserver
+      - staging_layer_db
+    networks:
+      - airflow_network
+
+  dbt:
+    image: ghcr.io/dbt-labs/dbt-core:1.5.0
+    container_name: dbt
+    env_file:
+      - .env  # This will load the environment variables from the .env file
+    volumes:
+      - ./dbt:/usr/app/dbt
+    environment:
+      - DBT_PROFILES_DIR=${DBT_PROFILES_DIR}
+    networks:
+      - airflow_network
+
+  staging_layer_db:
+    image: postgres:15
+    container_name: staging_layer_db
+    env_file:
+      - .env  # This will load the environment variables from the .env file
+    environment:
+      - POSTGRES_USER=${POSTGRES_STAGING_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_STAGING_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_STAGING_DB}
+    volumes:
+      - ./postgres/staging_layer_db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - airflow_network
+
+  olap_layer_db:
+    image: postgres:15
+    container_name: olap_layer_db
+    env_file:
+      - .env  # This will load the environment variables from the .env file
+    environment:
+      - POSTGRES_USER=${POSTGRES_ANALYTICS_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_ANALYTICS_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_ANALYTICS_DB}
+    volumes:
+      - ./postgres/olap_layer_db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5433:5432"
+    networks:
+      - airflow_network
+
+networks:
+  airflow_network:
+    driver: bridge
+
+volumes:
+  airflow_logs:
+    driver: local
+  airflow_plugins:
+    driver: local

@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS analytics_table (
+    id SERIAL PRIMARY KEY,
+    value INTEGER NOT NULL
+);
