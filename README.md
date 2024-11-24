@@ -32,7 +32,7 @@ The processing pipeline involved in the architecture is the next:
 
 The raw data is transformed into an star schema thats going to be stored in the postgres OLAP Layer. This new denormalized model allows for more agile queries that will support the company in the process of becoming a data-driven company.
 
-For more information [Check OLAP Data Model & Metadata Documentation](project_documentation/data_modeling/olap_metadata_doc)
+For more information [Check OLAP Data Model & Metadata Documentation](project_documentation/data_modeling/olap_metadata_doc.md)
 
 
 <img src="project_documentation/data_modeling/OLAP_star_model.png" alt="OLAP Star Model" style="display: block; margin-left: auto; margin-right: auto; width: 70%;">
