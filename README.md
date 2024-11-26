@@ -106,6 +106,8 @@ A Makefile was generated to provide a set of targets for managing Docker Compose
 
 Notes: you have to det up a linux windows subsystem fisrt if you are working with windows
 
+[Check Execution demonstration screenshots](project_documentation/execution_examples/execution_examples.md).
+
 ### Key Components and Purpose
 
 1. **Automated Dependency Checks**:

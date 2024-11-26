@@ -107,13 +107,14 @@ with DAG(
         provide_context=True
     )
 
+    """
     # BashOperator to run dbt run in the dbt-container
     dbt_run = BashOperator(
         task_id='dbt_run',
         bash_command="docker exec dbt-container dbt run",  # Command to execute dbt inside the container
         dag=dag,
-    )
+    )"""
 
     # Set task dependencies
-    iniciar_proceso >> extract_and_load_task >> dbt_run >>  finalizar_proceso # python_task will run before dbt_task
-    #iniciar_proceso >> extract_and_load_task >> finalizar_proceso
+    #iniciar_proceso >> extract_and_load_task >> dbt_run >>  finalizar_proceso # python_task will run before dbt_task
+    iniciar_proceso >> extract_and_load_task >> finalizar_proceso

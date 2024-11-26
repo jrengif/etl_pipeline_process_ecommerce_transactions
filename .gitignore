@@ -4,6 +4,7 @@ venv/
 # Ignore airflow logs
 airflow/logs/*
 airflow/logs/__pycache__/*
+airflow/dags/__pycache__/*
 
 # Ignores dbt logs
 dbt/logs/
