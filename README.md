@@ -28,6 +28,8 @@ The processing pipeline involved in the architecture is the next:
 
 <img src="project_documentation/architechture_documentation/solution_architechture.png" alt="Solution Architecture" style="display: block; margin-left: auto; margin-right: auto; width: 80%;">
 
+
+
 ## OLAP Layer - Star Model
 
 The raw data is transformed into an star schema thats going to be stored in the postgres OLAP Layer. This new denormalized model allows for more agile queries that will support the company in the process of becoming a data-driven company.
@@ -37,68 +39,6 @@ For more information [Check OLAP Data Model & Metadata Documentation](project_do
 <img src="project_documentation/data_modeling/OLAP_star_model.png" alt="OLAP Star Model" style="display: block; margin-left: auto; margin-right: auto; width: 70%;">
 
 ## Repository Structure
-
-This repository is designed to support an ETL pipeline using containerized services. It integrates **Apache Airflow** for orchestration, **DBT** for data transformation, **PostgreSQL** for data storage, and supporting scripts to facilitate development and deployment.
-
-## Folder Structure
-
-### `airflow/`
-Contains all necessary files for setting up and configuring Apache Airflow, including:
-- **DAGs** (Directed Acyclic Graphs): Defines the ETL workflows.
-- **Logs**: Airflow log files.
-- **requirements.txt**: Python dependencies for Airflow.
-
-### `dbt/`
-Contains the DBT project responsible for managing data transformations:
-- **models/**: DBT SQL models that define the data transformation logic.
-- **profiles.yml**: Configuration for connecting to the database.
-
-
-### `postgres/`
-Contains SQL scripts and configuration files for setting up PostgreSQL databases:
-- **init.sql.template**: SQL scripts for initializing staging and OLAP databases.
-- **init_sql_template.sh**: Shell script to set up the database environment..
-
-### `project_documentation/`
-A directory containing project-related documentation:
-- Architecture diagrams.
-- Workflow descriptions.
-- User and technical manuals.
-
-## Root Files
-
-- **`.gitignore`**  
-  Specifies which files and directories to exclude from version control, such as logs, environment files, and virtual environments.
-
-- **`Dockerfile`**  
-  Dockerfile for building the base image for the Airflow container, ensuring all dependencies are installed and configured.
-
-- **`Dockerfile.dbt`**  
-  Custom Dockerfile for building the DBT container, isolating DBT-specific dependencies.
-
-- **`Makefile`**  
-  A makefile to automate common tasks, including:
-  - Building Docker images.
-  - Running or cleaning up containers.
-  - Checking dependencies like Python and Docker installations.
-
-- **`README.md`**  
-  The primary documentation for the project, including:
-  - Overview of the repository.
-  - Setup and installation instructions.
-  - Usage details.
-
-- **`docker-compose.yml`**  
-  Defines and configures the services required to run the pipeline, including:
-  - Airflow webserver and scheduler.
-  - DBT container.
-  - PostgreSQL containers for staging and OLAP layers.
-
-- **`pre-commit-config.yaml`**  
-  Configuration for pre-commit hooks, ensuring code quality standards such as linting and formatting.
-
-- **`requirements.txt`**  
-  A list of Python dependencies required for the project, ensuring a consistent environment across all contributors.
 
 ## CI/CD Approach
 
@@ -140,28 +80,14 @@ make dbt      # Runs the DBT (Data Build Tool) tasks defined in the Makefile, ty
 
 ## Suggested architecture changes for real-world implementations
 
-This solution was designed to run in a local environment. However, for a real-world implementation, this approach may not be the most suitable. The local environment could be replaced with a cloud-based setup using AWS serverless services.
+For a real worl implementation of this solution it would be more 
 
-### Proposed Cloud-Based Architecture
+Esta solución fue pensada para correr en un ambiente local, sin embargo para una implementacion en el mundo real no seria la mas adecuda. Se podria cambiar el ambiente local por un entorno en la nube usando servicios serverless de AWS.
 
-#### Orchestration
-- **Amazon Managed Workflows for Apache Airflow (MWAA)**: Leverage MWAA to orchestrate and schedule workflows efficiently.
-
-#### Data Lakes
-- **AWS S3**: Use S3 as a data lake to manage data storage, enabling data movement between zones or acting as a staging area for raw data.
-
-#### Computing
-- **AWS Glue Jobs**: Utilize AWS Glue with PySpark for heavy workloads, ensuring scalability and efficient processing.
-
-#### Data Warehouse
-- **Amazon Redshift**: Replace PostgreSQL with Redshift for better performance when querying large datasets.
-
-### Additional Enhancements
-
-- **Data Quality Frameworks**: Implement frameworks such as **Great Expectations** to monitor data quality and trigger alerts when issues are detected.
-- **Data Quality Dashboards**: Use the logs generated to create dashboards on data quality using services like **Amazon QuickSight**.
-
-These adjustments would make the solution more robust, scalable, and suitable for production-grade environments.
+Orquestration:  Amazon Managed Workflows for Apache Airflow (MWAA)
+Datalakes: AWS S3 
+Computing: AWS Glue Jobs (con pyspark para cargas de trabajo pesadas)
+Datawarehouse: Redshift
 
 ## Relevant commands to check status on container services
 
@@ -169,55 +95,30 @@ These commands help you manage your Docker containers, Airflow DAGs, DBT workflo
 
 ### Docker Commands
 
-```bash
-# Lists all running Docker containers
-docker ps  # Shows currently running containers.
-# Lists all Docker containers, including stopped ones
-docker ps -a  # Shows all containers, whether running or stopped.
-# Builds and starts the services defined in the docker-compose.yml file
-docker-compose up --build  # Builds images (if needed) and starts the services.
-# Builds and starts the services in detached mode (runs in the background)
-docker-compose up --build -d  # Runs the services in detached mode, allowing you to continue using the terminal.
-# Stops and removes containers, networks, and volumes defined in the docker-compose.yml file
-docker-compose down -v  # Stops the services and removes all related containers, networks, and volumes.
-```
+- `docker ps`: Lists all running containers.
+- `docker ps -a`: Lists all containers, including stopped ones.
+- `docker-compose up --build`: Builds and starts the services defined in the `docker-compose.yml` file.
+- `docker-compose up --build -d`: Builds and starts the services in detached mode (runs in the background).
+- `docker-compose down -v`: Stops and removes containers, networks, and volumes defined in the `docker-compose.yml` file.
 
 ### Airflow Commands
 
-```bash
-# Lists all the DAGs (Directed Acyclic Graphs) currently available in Airflow
-docker exec -it airflow airflow dags list  # Shows all the DAGs currently available in the Airflow instance.
-# Lists any errors encountered when importing DAGs into Airflow
-docker exec -it airflow_webserver airflow dags list-import-errors  # Displays any errors that occurred during DAG import.
-```
+- `docker exec -it airflow airflow dags list`: Lists all the DAGs (Directed Acyclic Graphs) currently available in Airflow.
+- `docker exec -it airflow_webserver airflow dags list-import-errors`: Lists any errors encountered when importing DAGs into Airflow.
 
 ### DBT Commands
 
-```bash
-# Opens a bash shell inside the DBT container
-docker exec -it dbt-container bash  # Starts a bash shell session inside the DBT container for interactive work.
-# Runs a debug check in the DBT container to ensure your project is configured correctly
-docker exec -it dbt-container dbt debug  # Executes a DBT debug check to verify the project configuration and environment.
-```
+- `docker exec -it dbt-container bash`: Opens a bash shell inside the DBT container.
+- `docker exec -it dbt-container dbt debug`: Runs a debug check in the DBT container to ensure your project is configured correctly.
 
 #### DBT Workflow Commands
 
-```bash
-# Checks the DBT project's health and connectivity to the database
-dbt debug  # Verifies the configuration of the DBT project, including database connection and environment settings.
-# Compiles the DBT project, preparing it for execution
-dbt compile  # Compiles the DBT project without running transformations, useful for checking the SQL queries before execution.
-# Executes the DBT project, running the SQL transformations on the database
-dbt run  # Runs the DBT project, executing the SQL models and transformations on the database.
-```
+- `dbt debug`: Checks the DBT project's health and connectivity to the database.
+- `dbt compile`: Compiles the DBT project, preparing it for execution.
+- `dbt run`: Executes the DBT project, running the SQL transformations on the database.
 
 ### Python Virtual Environment Commands
 
-```bash
-# Creates a new virtual environment in the 'venv' directory
-python -m venv venv  # Initializes a new Python virtual environment in the 'venv' directory.
-# Activates the virtual environment on Windows
-.\venv\Scripts\activate  # Activates the virtual environment on Windows (for Command Prompt or PowerShell).
-# Deactivates the current Python virtual environment
-deactivate  # Deactivates the currently active virtual environment, returning to the system Python environment.
-```
+- `python -m venv venv`: Creates a new virtual environment in the `venv` directory.
+- `.\venv\Scripts\activate`: Activates the virtual environment on Windows.
+- `deactivate`: Deactivates the current Python virtual environment.
