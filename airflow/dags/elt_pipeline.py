@@ -3,8 +3,7 @@ from datetime import datetime
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.operators.empty import EmptyOperator
-from airflow.providers.docker.operators.docker import DockerOperator
-from airflow.providers.postgres.hooks.postgres import PostgresHook
+from airflow.operators.bash import BashOperator
 from ucimlrepo import fetch_ucirepo
 import pandas as pd
 from sqlalchemy import create_engine, inspect
@@ -14,10 +13,6 @@ import logging
 # Enable SQLAlchemy logging to see the executed SQL queries
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Python function for PythonOperator
-def print_hello_world():
-    logger.info("Hello, world! Running the PythonOperator task!")
 
 def extract_and_upload_data(**kwargs):
     # Fetch dataset from UCI repository
@@ -112,18 +107,12 @@ with DAG(
         provide_context=True
     )
 
-    # DockerOperator to run dbt commands inside the dbt-container
-    dbt_run = DockerOperator(
-        task_id='dbt_run',
-        image='python:3.9-slim',  # Replace with your actual DBT container image if needed
-        api_version='auto',
-        auto_remove=True,
-        command='dbt run --target analytics',  # Command to run DBT
-        container_name='dbt-container',  # Ensure this matches the name of the container defined in docker-compose
-        network_mode='airflow_network',  # Ensure this matches the network used in your Docker Compose file
-        dag=dag
+    # BashOperator to execute DBT inside the DBT container
+    run_dbt = BashOperator(
+        task_id='run_dbt_task',
+        bash_command='docker exec dbt-container dbt run'
     )
 
     # Set task dependencies
-    iniciar_proceso >> extract_and_load_task >> dbt_run >>  finalizar_proceso # python_task will run before dbt_task
+    iniciar_proceso >> extract_and_load_task >> run_dbt >>  finalizar_proceso # python_task will run before dbt_task
     #iniciar_proceso >> extract_and_load_task >> finalizar_proceso
