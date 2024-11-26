@@ -1,6 +1,6 @@
 FROM python:3.9-slim
 
-# Install necessary packages including git
+# Install necessary packages
 RUN apt-get update && apt-get install -y \
     postgresql-client \
     libpq-dev \
@@ -9,9 +9,10 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /usr/app/dbt
 
+# Copy DBT project and requirements
 COPY ./dbt /usr/app/dbt
-COPY .env /usr/app/.env
 COPY requirements.txt /requirements.txt
 RUN pip install --no-cache-dir -r /requirements.txt
 
+# Set DBT profiles directory
 ENV DBT_PROFILES_DIR=/usr/app/dbt

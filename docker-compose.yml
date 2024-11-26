@@ -75,14 +75,10 @@ services:
       - POSTGRES_USER=${POSTGRES_STAGING_USER}
       - POSTGRES_PASSWORD=${POSTGRES_STAGING_PASSWORD}
       - POSTGRES_DB=${POSTGRES_STAGING_DB}
-    volumes:
-      - ./postgres/staging_layer_db/init.sql.template:/docker-entrypoint-initdb.d/init.sql.template
-      - ./postgres/staging_layer_db/init_sql_template.sh:/docker-entrypoint-initdb.d/init_sql_template.sh
     ports:
       - "5432:5432"
     networks:
       - airflow_network
-    command: bash -c "apt-get update && apt-get install -y gettext && /docker-entrypoint-initdb.d/init_sql_template.sh && docker-entrypoint.sh postgres"
 
   olap_layer_db:
     image: postgres:15
@@ -97,19 +93,15 @@ services:
       - POSTGRES_USER=${POSTGRES_ANALYTICS_USER}
       - POSTGRES_PASSWORD=${POSTGRES_ANALYTICS_PASSWORD}
       - POSTGRES_DB=${POSTGRES_ANALYTICS_DB}
-    volumes:
-      - ./postgres/olap_layer_db/init.sql.template:/docker-entrypoint-initdb.d/init.sql.template
-      - ./postgres/olap_layer_db/init_sql_template.sh:/docker-entrypoint-initdb.d/init_sql_template.sh
     ports:
       - "5433:5432"
     networks:
       - airflow_network
-    command: bash -c "apt-get update && apt-get install -y gettext && /docker-entrypoint-initdb.d/init_sql_template.sh && docker-entrypoint.sh postgres"
 
-  dbt:
+  dbt-container:
     build:
       context: .  # Path to the directory containing the Dockerfile.dbt
-      dockerfile: Dockerfile.dbt  # Specify the custom Dockerfile for DBT
+      dockerfile: Dockerfile.dbt # Specify the custom Dockerfile for DBT
     container_name: dbt-container
     restart: on-failure
     env_file:
@@ -137,7 +129,7 @@ services:
         condition: service_healthy
       olap_layer_db:
         condition: service_healthy
-    command: bash -c "echo 'DBT container started'; tail -f /dev/null"
+    command: bash -c "dbt debug && tail -f /dev/null"
     networks:
       - airflow_network
 

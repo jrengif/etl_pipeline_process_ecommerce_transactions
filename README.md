@@ -80,14 +80,38 @@ make dbt      # Runs the DBT (Data Build Tool) tasks defined in the Makefile, ty
 
 ## Suggested architecture changes for real-world implementations
 
-For a real worl implementation of this solution it would be more 
+This solution was designed to run in a local environment, which is suitable for testing and development purposes. However, for a real-world implementation, this setup might not be the most appropriate. A cloud-based environment using serverless services on AWS could significantly enhance scalability, reliability, and maintainability. 
 
-Esta solución fue pensada para correr en un ambiente local, sin embargo para una implementacion en el mundo real no seria la mas adecuda. Se podria cambiar el ambiente local por un entorno en la nube usando servicios serverless de AWS.
+### Suggested Cloud Architecture:
 
-Orquestration:  Amazon Managed Workflows for Apache Airflow (MWAA)
-Datalakes: AWS S3 
-Computing: AWS Glue Jobs (con pyspark para cargas de trabajo pesadas)
-Datawarehouse: Redshift
+- **Orchestration:**  
+  Utilize **Amazon Managed Workflows for Apache Airflow (MWAA)** for orchestrating workflows. MWAA provides a fully managed service for Apache Airflow, reducing the operational overhead of managing Airflow infrastructure.
+
+- **Data Lakes:**  
+  Replace the local file storage with **AWS S3** for scalable, durable, and cost-effective storage of raw and processed data.
+
+- **Computing:**  
+  Leverage **AWS Glue Jobs** for data processing and transformations. AWS Glue supports **PySpark**, which is ideal for heavy workloads, offering distributed processing and integration with other AWS services.
+
+- **Data Warehouse:**  
+  Migrate to **Amazon Redshift** for analytics and business intelligence use cases. Redshift provides a fully managed, petabyte-scale data warehouse solution with powerful querying capabilities.
+
+### Data Quality and Monitoring
+
+- **Data Validation Framework:**  
+  Incorporate a framework like **Great Expectations** to enforce data quality checks and validations. This ensures the integrity and reliability of your data pipeline.
+
+- **Data Quality Monitoring:**  
+  Use services like **Amazon QuickSight** to visualize and monitor data quality metrics. Dashboards can provide insights into validation results, anomalies, and overall pipeline health.
+
+### Benefits of This Approach
+
+- Reduced operational complexity with serverless and managed services.
+- Scalability to handle larger workloads and datasets.
+- Enhanced reliability, as cloud services provide fault tolerance and high availability.
+- Seamless integration of data quality and monitoring tools for proactive issue detection.
+
+This approach ensures a robust and production-ready architecture suitable for real-world data engineering workflows.
 
 ## Relevant commands to check status on container services
 
