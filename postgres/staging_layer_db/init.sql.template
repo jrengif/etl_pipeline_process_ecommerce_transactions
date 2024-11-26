@@ -1,0 +1,6 @@
+-- init.sql.template (Use this file as a template with placeholders)
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ${POSTGRES_STAGING_USER};
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ${POSTGRES_STAGING_USER};
+
+-- Verify permissions for troubleshooting
+\z public.*

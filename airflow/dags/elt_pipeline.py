@@ -5,42 +5,89 @@ from airflow.operators.python import PythonOperator
 from airflow.operators.empty import EmptyOperator
 from airflow.providers.docker.operators.docker import DockerOperator
 from airflow.providers.postgres.hooks.postgres import PostgresHook
-
 from ucimlrepo import fetch_ucirepo
 import pandas as pd
-from sqlalchemy import create_engine
-from datetime import datetime
+from sqlalchemy import create_engine, inspect
+from sqlalchemy.exc import SQLAlchemyError
+import logging
+
+# Enable SQLAlchemy logging to see the executed SQL queries
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Python function for PythonOperator
 def print_hello_world():
-    print("Hello, world! Running the PythonOperator task!")
+    logger.info("Hello, world! Running the PythonOperator task!")
 
-# Function to extract data from CSV and upload to PostgreSQL
 def extract_and_upload_data(**kwargs):
     # Fetch dataset from UCI repository
     online_retail = fetch_ucirepo(id=352)
-    X = online_retail.data.features
-    y = online_retail.data.targets
 
-    # Combine features and targets to create a complete dataset
-    data = pd.DataFrame(X, columns=online_retail.data.feature_names)
-    data['target'] = y  # Add target column to data
+    # Extracting the 'ids' and 'features' DataFrames
+    ids_df = online_retail['data']['ids']
+    features_df = online_retail['data']['features']
+
+    # Merging the two DataFrames on the index (InvoiceNo, StockCode)
+    data = pd.merge(ids_df, features_df, left_index=True, right_index=True)
     
+    rename_columns_dict = {
+        "InvoiceNo": "invoice_no",
+        "StockCode": "stock_code",
+        "Description": "description",
+        "Quantity": "quantity",
+        "InvoiceDate": "invoice_date",
+        "UnitPrice": "unit_price",
+        "CustomerID": "customer_id",
+        "Country": "country"
+    }
+    data = data.rename(columns=rename_columns_dict)
+
     # Access environment variables directly
-    postgres_user = os.getenv("POSTGRES_STAGING_USER")
-    postgres_password = os.getenv("POSTGRES_STAGING_PASSWORD")
-    postgres_host = os.getenv("POSTGRES_STAGING_HOST")
-    postgres_port = os.getenv("POSTGRES_STAGING_PORT")
-    postgres_db = os.getenv("POSTGRES_STAGING_DB")
-    
-    # Create SQLAlchemy engine with direct connection details
-    engine = create_engine(f'postgresql://{postgres_user}:{postgres_password}@{postgres_host}:{postgres_port}/{postgres_db}')
-    
-    # Upload the DataFrame to PostgreSQL - Replace 'your_table_name' with your actual table name
-    data.to_sql('online_retail_data', con=engine, if_exists='replace', index=False)
-    print(f"Uploaded {len(data)} records to the PostgreSQL staging database.")
+    POSTGRES_STAGING_USER = os.getenv("POSTGRES_STAGING_USER")
+    POSTGRES_STAGING_PASSWORD = os.getenv("POSTGRES_STAGING_PASSWORD")
+    POSTGRES_STAGING_HOST = os.getenv("POSTGRES_STAGING_HOST")
+    POSTGRES_STAGING_PORT = os.getenv("POSTGRES_STAGING_PORT")
+    POSTGRES_STAGING_DB = os.getenv("POSTGRES_STAGING_DB")
+    POSTGRES_STAGING_SCHEMA = os.getenv("POSTGRES_STAGING_SCHEMA", "public")
+    POSTGRES_STAGING_RAW_TABLE = os.getenv("POSTGRES_STAGING_RAW_TABLE", "raw_online_retail_data")
 
+    try:
+        # Create SQLAlchemy engine
+        engine = create_engine(
+            f'postgresql://{POSTGRES_STAGING_USER}:{POSTGRES_STAGING_PASSWORD}@{POSTGRES_STAGING_HOST}:{POSTGRES_STAGING_PORT}/{POSTGRES_STAGING_DB}'
+        )
 
+        # Connect to the database and check for table existence
+        with engine.connect() as connection:
+            inspector = inspect(connection)
+            if not inspector.has_table(POSTGRES_STAGING_RAW_TABLE, schema=POSTGRES_STAGING_SCHEMA):
+                logger.info(f"Table {POSTGRES_STAGING_RAW_TABLE} does not exist. Creating table...")
+
+                # Create the table schema in PostgreSQL based on the DataFrame structure
+                data.head(0).to_sql(
+                    POSTGRES_STAGING_RAW_TABLE,
+                    con=engine,
+                    schema=POSTGRES_STAGING_SCHEMA,
+                    if_exists='replace',
+                    index=False
+                )
+                logger.info(f"Table {POSTGRES_STAGING_RAW_TABLE} created successfully.")
+            
+            # Insert data into the table in chunks
+            logger.info(f"Inserting data into {POSTGRES_STAGING_SCHEMA}.{POSTGRES_STAGING_RAW_TABLE}...")
+            data.to_sql(
+                POSTGRES_STAGING_RAW_TABLE,
+                con=engine,
+                schema=POSTGRES_STAGING_SCHEMA,
+                if_exists='append',
+                index=False,
+                chunksize=1000  # Insert data in chunks of 1000 rows
+            )
+            logger.info(f"Data successfully inserted into {POSTGRES_STAGING_SCHEMA}.{POSTGRES_STAGING_RAW_TABLE}.")
+
+    except SQLAlchemyError as e:
+        logger.error(f"Error occurred: {e}")
+        
 # Define the DAG
 with DAG(
     'dbt_python_operator_dag',
@@ -59,24 +106,24 @@ with DAG(
     )
 
     # Define the PythonOperator for extracting data and uploading it
-    extract_and_upload_task = PythonOperator(
+    extract_and_load_task = PythonOperator(
         task_id='extract_and_upload',
         python_callable=extract_and_upload_data,
         provide_context=True
     )
 
-    """
-    # DockerOperator to run dbt commands inside DBT container
+    # DockerOperator to run dbt commands inside the dbt-container
     dbt_run = DockerOperator(
         task_id='dbt_run',
-        image='dbt_image:latest',  # DBT container image, replace with the actual image name
+        image='python:3.9-slim',  # Replace with your actual DBT container image if needed
         api_version='auto',
         auto_remove=True,
-        command='dbt run',  # Replace with the dbt command you want to run, e.g., dbt run, dbt test, etc.
-        network_mode='bridge',  # Adjust based on how containers are networked
+        command='dbt run --target analytics',  # Command to run DBT
+        container_name='dbt-container',  # Ensure this matches the name of the container defined in docker-compose
+        network_mode='airflow_network',  # Ensure this matches the network used in your Docker Compose file
         dag=dag
-    )"""
+    )
 
     # Set task dependencies
-    #iniciar_proceso >> python_task >> dbt_run >>  finalizar_proceso # python_task will run before dbt_task
-    iniciar_proceso >> extract_and_upload_task >> finalizar_proceso
+    iniciar_proceso >> extract_and_load_task >> dbt_run >>  finalizar_proceso # python_task will run before dbt_task
+    #iniciar_proceso >> extract_and_load_task >> finalizar_proceso

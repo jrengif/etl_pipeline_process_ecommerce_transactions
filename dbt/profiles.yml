@@ -1,0 +1,22 @@
+default:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('POSTGRES_STAGING_HOST') }}"  # Using Jinja to evaluate environment variable
+      user: "{{ env_var('POSTGRES_STAGING_USER') }}"
+      password: "{{ env_var('POSTGRES_STAGING_PASSWORD') }}"
+      dbname: "{{ env_var('POSTGRES_STAGING_DB') }}"
+      schema: "{{ env_var('POSTGRES_STAGING_SCHEMA') }}"
+      port: "{{ env_var('POSTGRES_STAGING_PORT') | int }}"
+      threads: 4
+
+    analytics:
+      type: postgres
+      host: "{{ env_var('POSTGRES_ANALYTICS_HOST') }}"
+      user: "{{ env_var('POSTGRES_ANALYTICS_USER') }}"
+      password: "{{ env_var('POSTGRES_ANALYTICS_PASSWORD') }}"
+      dbname: "{{ env_var('POSTGRES_ANALYTICS_DB') }}"
+      schema: "{{ env_var('POSTGRES_ANALYTICS_SCHEMA') }}"
+      port: "{{ env_var('POSTGRES_ANALYTICS_PORT') | int }}"
+      threads: 4

@@ -1,0 +1,20 @@
+name: 'my_dbt_project'
+version: '1.0.0'
+config-version: 2
+
+profile: 'default'
+
+model-paths:
+  - 'models'
+target-path: 'target'
+clean-targets:
+  - 'target'
+
+vars:
+  staging_schema: 'public'  # Set the schema to 'public'
+
+models:
+  my_dbt_project:
+    marts:
+      +schema: 'public'
+      +materialized: incremental

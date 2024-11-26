@@ -1,0 +1,7 @@
+version: 2
+
+sources:
+  - name: staging_layer_db
+    schema: "{{ var('staging_schema', 'staging_layer') }}"
+    tables:
+      - name: raw_online_retail_data

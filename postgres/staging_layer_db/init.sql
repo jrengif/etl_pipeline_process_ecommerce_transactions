@@ -1,4 +1,0 @@
-CREATE TABLE IF NOT EXISTS ingestion_table (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(50) NOT NULL
-);

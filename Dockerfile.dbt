@@ -1,0 +1,17 @@
+FROM python:3.9-slim
+
+# Install necessary packages including git
+RUN apt-get update && apt-get install -y \
+    postgresql-client \
+    libpq-dev \
+    gcc \
+    git && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /usr/app/dbt
+
+COPY ./dbt /usr/app/dbt
+COPY .env /usr/app/.env
+COPY requirements.txt /requirements.txt
+RUN pip install --no-cache-dir -r /requirements.txt
+
+ENV DBT_PROFILES_DIR=/usr/app/dbt

@@ -8,7 +8,7 @@ services:
       - .env  # This will load the environment variables from the .env file
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://{{ env_var("POSTGRES_STAGING_USER") }}:{{ env_var("POSTGRES_STAGING_PASSWORD") }}@{{ env_var("POSTGRES_STAGING_HOST") }}:{{ env_var("POSTGRES_STAGING_PORT") }}/{{ env_var("POSTGRES_STAGING_DB") }}
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_STAGING_USER}:${POSTGRES_STAGING_PASSWORD}@${POSTGRES_STAGING_HOST}:${POSTGRES_STAGING_PORT}/${POSTGRES_STAGING_DB}
       - AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX=True  # Important for running Airflow behind a proxy  or localhost
       - _AIRFLOW_WWW_USER_USERNAME=${AIRFLOW_ADMIN_USERNAME}
       - _AIRFLOW_WWW_USER_PASSWORD=${AIRFLOW_ADMIN_PASSWORD}
@@ -19,14 +19,17 @@ services:
       - POSTGRES_STAGING_DB=${POSTGRES_STAGING_DB}
       - POSTGRES_STAGING_PORT=${POSTGRES_STAGING_PORT}
       - POSTGRES_STAGING_HOST=${POSTGRES_STAGING_HOST}
+      - POSTGRES_STAGING_SCHEMA=${POSTGRES_STAGING_SCHEMA}
+      - POSTGRES_STAGING_RAW_TABLE=${POSTGRES_STAGING_RAW_TABLE}
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/plugins:/opt/airflow/plugins
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/requirements.txt:/requirements.txt
+      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "8080:8080"  # Expose port 8080 for Airflow Web UI
-    command: bash -c "pip install -r /requirements.txt && airflow db init && airflow users create --username ${AIRFLOW_ADMIN_USERNAME} --password ${AIRFLOW_ADMIN_PASSWORD} --role Admin --firstname Admin --lastname User --email admin@example.com && airflow webserver --host 0.0.0.0 --port 8080"
+    command: bash -c "pip install -r /requirements.txt && airflow db reset -y && airflow db init && airflow users create --username ${AIRFLOW_ADMIN_USERNAME} --password ${AIRFLOW_ADMIN_PASSWORD} --role Admin --firstname Admin --lastname User --email admin@example.com && airflow webserver --host 0.0.0.0 --port 8080"
     depends_on:
       - staging_layer_db
     networks:
@@ -37,40 +40,35 @@ services:
     container_name: airflow-scheduler
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=${AIRFLOW_SQL_ALCHEMY_CONN}
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_STAGING_USER}:${POSTGRES_STAGING_PASSWORD}@${POSTGRES_STAGING_HOST}:${POSTGRES_STAGING_PORT}/${POSTGRES_STAGING_DB}
       - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY}
       - POSTGRES_STAGING_USER=${POSTGRES_STAGING_USER}
       - POSTGRES_STAGING_PASSWORD=${POSTGRES_STAGING_PASSWORD}
       - POSTGRES_STAGING_DB=${POSTGRES_STAGING_DB}
       - POSTGRES_STAGING_PORT=${POSTGRES_STAGING_PORT}
       - POSTGRES_STAGING_HOST=${POSTGRES_STAGING_HOST}
+      - POSTGRES_STAGING_SCHEMA=${POSTGRES_STAGING_SCHEMA}
+      - POSTGRES_STAGING_RAW_TABLE=${POSTGRES_STAGING_RAW_TABLE}
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/plugins:/opt/airflow/plugins
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/requirements.txt:/requirements.txt
-    command: bash -c "pip install -r /requirements.txt && airflow db init && airflow scheduler"
+      - /var/run/docker.sock:/var/run/docker.sock
+    command:  bash -c "pip install -r /requirements.txt && airflow scheduler"
     depends_on:
       - airflow_webserver
       - staging_layer_db
     networks:
       - airflow_network
 
-  dbt:
-    image: ghcr.io/dbt-labs/dbt-core:1.5.0
-    container_name: dbt
-    env_file:
-      - .env  # This will load the environment variables from the .env file
-    volumes:
-      - ./dbt:/usr/app/dbt
-    environment:
-      - DBT_PROFILES_DIR=${DBT_PROFILES_DIR}
-    networks:
-      - airflow_network
-
   staging_layer_db:
     image: postgres:15
     container_name: staging_layer_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_STAGING_USER} -d ${POSTGRES_STAGING_DB}  || (echo 'Postgres not ready'; exit 1)"]
+      interval: 10s
+      retries: 5
     env_file:
       - .env  # This will load the environment variables from the .env file
     environment:
@@ -78,15 +76,21 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_STAGING_PASSWORD}
       - POSTGRES_DB=${POSTGRES_STAGING_DB}
     volumes:
-      - ./postgres/staging_layer_db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./postgres/staging_layer_db/init.sql.template:/docker-entrypoint-initdb.d/init.sql.template
+      - ./postgres/staging_layer_db/init_sql_template.sh:/docker-entrypoint-initdb.d/init_sql_template.sh
     ports:
       - "5432:5432"
     networks:
       - airflow_network
+    command: bash -c "apt-get update && apt-get install -y gettext && /docker-entrypoint-initdb.d/init_sql_template.sh && docker-entrypoint.sh postgres"
 
   olap_layer_db:
     image: postgres:15
     container_name: olap_layer_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_ANALYTICS_USER} -d ${POSTGRES_ANALYTICS_DB}  || (echo 'Postgres not ready'; exit 1)"]
+      interval: 10s
+      retries: 5
     env_file:
       - .env  # This will load the environment variables from the .env file
     environment:
@@ -94,11 +98,49 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_ANALYTICS_PASSWORD}
       - POSTGRES_DB=${POSTGRES_ANALYTICS_DB}
     volumes:
-      - ./postgres/olap_layer_db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./postgres/olap_layer_db/init.sql.template:/docker-entrypoint-initdb.d/init.sql.template
+      - ./postgres/olap_layer_db/init_sql_template.sh:/docker-entrypoint-initdb.d/init_sql_template.sh
     ports:
       - "5433:5432"
     networks:
       - airflow_network
+    command: bash -c "apt-get update && apt-get install -y gettext && /docker-entrypoint-initdb.d/init_sql_template.sh && docker-entrypoint.sh postgres"
+
+  dbt:
+    build:
+      context: .  # Path to the directory containing the Dockerfile.dbt
+      dockerfile: Dockerfile.dbt  # Specify the custom Dockerfile for DBT
+    container_name: dbt-container
+    restart: on-failure
+    env_file:
+      - .env
+    volumes:
+      - ./dbt:/usr/app/dbt  # Mount your local DBT project directory
+    environment:
+      - DBT_PROFILES_DIR=/usr/app/dbt
+      - POSTGRES_STAGING_HOST=${POSTGRES_STAGING_HOST}
+      - POSTGRES_STAGING_USER=${POSTGRES_STAGING_USER}
+      - POSTGRES_STAGING_PASSWORD=${POSTGRES_STAGING_PASSWORD}
+      - POSTGRES_STAGING_DB=${POSTGRES_STAGING_DB}
+      - POSTGRES_STAGING_SCHEMA=${POSTGRES_STAGING_SCHEMA}
+      - POSTGRES_STAGING_PORT=${POSTGRES_STAGING_PORT}
+      - POSTGRES_STAGING_RAW_TABLE=${POSTGRES_STAGING_RAW_TABLE}
+      - POSTGRES_ANALYTICS_HOST=${POSTGRES_ANALYTICS_HOST}
+      - POSTGRES_ANALYTICS_USER=${POSTGRES_ANALYTICS_USER}
+      - POSTGRES_ANALYTICS_PASSWORD=${POSTGRES_ANALYTICS_PASSWORD}
+      - POSTGRES_ANALYTICS_DB=${POSTGRES_ANALYTICS_DB}
+      - POSTGRES_ANALYTICS_SCHEMA=${POSTGRES_ANALYTICS_SCHEMA}
+      - POSTGRES_ANALYTICS_PORT=${POSTGRES_ANALYTICS_PORT}
+    working_dir: /usr/app/dbt
+    depends_on:
+      staging_layer_db:
+        condition: service_healthy
+      olap_layer_db:
+        condition: service_healthy
+    command: bash -c "echo 'DBT container started'; tail -f /dev/null"
+    networks:
+      - airflow_network
+
 
 networks:
   airflow_network:

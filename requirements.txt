@@ -1,1 +1,15 @@
+pandas==1.5.2  # For working with data frames (if needed)
 cryptography
+ucimlrepo # library to extract de dataset
+sqlalchemy
+jupyter
+ipykernel
+notebook
+apache-airflow==2.9.0  # Airflow core version
+apache-airflow[postgres,redis]==2.9.0  # Airflow with Postgres and Redis support
+apache-airflow-providers-docker==2.7.0  # Docker provider for Airflow to run Docker containers
+agate==1.6.1
+dbt-core==1.5.0
+dbt-postgres==1.5.0
+psycopg2-binary==2.9.3      # PostgreSQL adapter
+pyyaml>=6.0         # For DBT's YAML configurations
